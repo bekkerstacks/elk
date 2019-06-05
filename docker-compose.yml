@@ -11,6 +11,7 @@ services:
       - "node.data=true"
       - "node.ingest=true"
       - "node.name=es-node.{{.Task.Slot}}.{{.Node.Hostname}}"
+      - "LOGSPOUT=ignore"
     networks:
        - esnet
     ports:
@@ -23,6 +24,38 @@ services:
       mode: replicated
       replicas: 1
 
+  logstash:
+    image: docker.elastic.co/logstash/logstash-oss:6.7.0
+    environment:
+      - LOGSPOUT=ignore
+    networks:
+      - esnet
+    configs:
+      - source: ls_config.v1
+        target: /usr/share/logstash/pipeline/logstash.conf
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana-oss:${ELASTIC_VERSION:-6.7.0}
+    networks:
+      - esnet
+    ports:
+      - target: 5601
+        published: 5601
+        protocol: tcp
+        mode: host
+    environment:
+      - SERVER_NAME=kibana.${DOMAIN:-localhost}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_HOST:-http://elasticsearch}:${ELASTICSEARCH_PORT:-9200}
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOST:-http://elasticsearch}:${ELASTICSEARCH_PORT:-9200}
+      - LOGSPOUT=ignore
+    deploy:
+      mode: replicated
+      replicas: 1
+
 networks:
   esnet:
     driver: overlay
+
+configs:
+  ls_config.v1:
+    file: $PWD/logstash/config/logstash.conf
